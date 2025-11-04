@@ -1,6 +1,7 @@
+
 extends Control
-const ThemeUtil            = preload("res://scripts/ui/ThemeUtil.gd")
-const FinanceServiceRes    = preload("res://scripts/services/FinanceService.gd")
+const ThemeUtil         = preload("res://scripts/ui/ThemeUtil.gd")
+const FinanceServiceRes = preload("res://scripts/services/FinanceService.gd")
 
 var _root: VBoxContainer
 var _list: VBoxContainer
@@ -8,7 +9,10 @@ var _search: LineEdit
 var _jobs: Array[Dictionary] = []
 
 func _ready() -> void:
-	print("[Jobs v11] _ready()")
+	anchor_right = 1.0
+	anchor_bottom = 1.0
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	_build_ui()
 	_load_jobs()
 	_rebuild()
@@ -16,33 +20,61 @@ func _ready() -> void:
 func _build_ui() -> void:
 	_root = VBoxContainer.new()
 	_root.add_theme_constant_override("separation", 8)
+	_root.anchor_right = 1.0
+	_root.anchor_bottom = 1.0
+	_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_root.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	add_child(_root)
 
-	# Header
-	var header_card := PanelContainer.new(); ThemeUtil.style_glass_header(header_card); _root.add_child(header_card)
-	var hb := HBoxContainer.new(); header_card.add_child(hb)
-	var title := Label.new(); title.text = "Jobs"; ThemeUtil.set_label_color(title); title.add_theme_font_size_override("font_size", 16); hb.add_child(title)
-	var fill := Control.new(); fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(fill)
+	var header_card := PanelContainer.new()
+	ThemeUtil.style_glass_header(header_card)
+	header_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_root.add_child(header_card)
+
+	var hb := HBoxContainer.new()
+	hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_card.add_child(hb)
+
+	var title := Label.new()
+	title.text = "Jobs"
+	ThemeUtil.set_label_color(title)
+	title.add_theme_font_size_override("font_size", 16)
+	hb.add_child(title)
+
+	var fill := Control.new()
+	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(fill)
+
 	_search = LineEdit.new()
 	_search.placeholder_text = "Search jobs..."
-	_search.custom_minimum_size = Vector2(240,0)
+	_search.custom_minimum_size = Vector2(240, 0)
 	_search.text_changed.connect(func(_t: String) -> void: _rebuild())
 	hb.add_child(_search)
 
-	# List card
-	var card := PanelContainer.new(); ThemeUtil.style_card(card); _root.add_child(card)
+	var card := PanelContainer.new()
+	ThemeUtil.style_card(card)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	_root.add_child(card)
+
 	var m := MarginContainer.new()
-	m.add_theme_constant_override("margin_left", 10)
-	m.add_theme_constant_override("margin_top", 10)
-	m.add_theme_constant_override("margin_right", 10)
-	m.add_theme_constant_override("margin_bottom", 10)
+	for k in ["left","top","right","bottom"]:
+		m.add_theme_constant_override("margin_" + k, 10)
+	m.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	m.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	card.add_child(m)
+
 	var sc := ScrollContainer.new()
 	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	sc.anchor_right = 1.0
+	sc.anchor_bottom = 1.0
 	m.add_child(sc)
+
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 4)
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	sc.add_child(_list)
 
 func _load_jobs() -> void:
@@ -51,30 +83,16 @@ func _load_jobs() -> void:
 		for j in GameState.data.jobs:
 			if typeof(j) == TYPE_DICTIONARY:
 				_jobs.append(j as Dictionary)
-	print("[Jobs v11] loaded jobs =", _jobs.size())
 
 func _rebuild() -> void:
 	for c in _list.get_children(): c.queue_free()
 
-	# Empty-state with seeder
 	if _jobs.is_empty():
-		var none_box := VBoxContainer.new()
-		none_box.add_theme_constant_override("separation", 8)
 		var none := Label.new(); ThemeUtil.set_label_color(none)
 		none.text = "No jobs yet."
 		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		none.custom_minimum_size = Vector2(0, 120)
-		none_box.add_child(none)
-
-		var seed_btn := Button.new()
-		seed_btn.text = "Generate Sample Jobs"
-		seed_btn.pressed.connect(func() -> void:
-			_seed_jobs()
-			_load_jobs()
-			_rebuild()
-		)
-		none_box.add_child(seed_btn)
-		_list.add_child(none_box)
+		_list.add_child(none)
 		return
 
 	var q := _search.text.to_lower()
@@ -93,20 +111,19 @@ func _rebuild() -> void:
 		none.custom_minimum_size = Vector2(0, 120)
 		_list.add_child(none)
 
-	print("[Jobs v11] list shown =", shown)
-
 func _job_label(j: Dictionary) -> String:
 	var o := String(j.get("origin", ""))
 	var d := String(j.get("destination", ""))
 	var st := String(j.get("status", "Available"))
 	if o == "" and d == "":
-		# fallback if schema uses "title"
 		return String(j.get("title", "[Untitled Job]")) + " [" + st + "]"
 	return "%s → %s [%s]" % [o, d, st]
 
 func _row(j: Dictionary) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, 36)
 
 	var stripe := ColorRect.new()
 	stripe.color = _status_color(String(j.get("status","")))
@@ -117,7 +134,8 @@ func _row(j: Dictionary) -> Control:
 	lbl.text = _job_label(j)
 	row.add_child(lbl)
 
-	var fill := Control.new(); fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var fill := Control.new()
+	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(fill)
 
 	var btn := Button.new()
@@ -145,7 +163,6 @@ func _advance_job(j: Dictionary) -> void:
 		j["progress"] = 0.0
 	elif st == "in transit":
 		j["status"] = "Completed"
-		# finance credit
 		var fin: Node = FinanceServiceRes.new()
 		if fin.has_method("ensure_defaults"): fin.ensure_defaults()
 		if fin.has_method("add_tx"):
@@ -163,21 +180,3 @@ func _status_color(st: String) -> Color:
 	if st == "in transit": return Color(0.25,0.65,0.35)
 	if st == "completed": return Color(0.40,0.40,0.40)
 	return Color(0.30,0.30,0.30)
-
-func _seed_jobs() -> void:
-	if not GameState.data.has("jobs"):
-		GameState.data.jobs = []
-	var arr: Array = GameState.data.jobs
-	var samples: Array[Dictionary] = [
-		{"origin":"Boise, ID","destination":"Salt Lake City, UT","pay": 2850.0,"status":"Available"},
-		{"origin":"Seattle, WA","destination":"Portland, OR","pay": 1400.0,"status":"Available"},
-		{"origin":"Denver, CO","destination":"Phoenix, AZ","pay": 3100.0,"status":"Assigned","hrs_waiting":2},
-		{"origin":"Los Angeles, CA","destination":"Dallas, TX","pay": 6200.0,"status":"In Transit","progress":35.0},
-		{"origin":"Chicago, IL","destination":"Cincinnati, OH","pay": 1800.0,"status":"Available"},
-		{"origin":"Reno, NV","destination":"Boise, ID","pay": 2100.0,"status":"Available"}
-	]
-	for s in samples:
-		arr.append(s)
-	GameState.data.jobs = arr
-	GameState.save_now()
-	print("[Jobs v11] seeded", samples.size(), "jobs")

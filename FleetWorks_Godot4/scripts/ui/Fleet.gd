@@ -2,85 +2,115 @@
 extends Control
 const ThemeUtil = preload("res://scripts/ui/ThemeUtil.gd")
 
+var _root: VBoxContainer
+var _list: VBoxContainer
+var _search: LineEdit
+var _fleet: Array = []
+
 func _ready() -> void:
-	_build()
+    anchor_right = 1.0
+    anchor_bottom = 1.0
+    size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    size_flags_vertical   = Control.SIZE_EXPAND_FILL
+    _build_ui()
+    _load_fleet()
+    _rebuild()
 
-func _build() -> void:
-	for c in get_children():
-		c.queue_free()
+func _build_ui() -> void:
+    _root = VBoxContainer.new()
+    _root.add_theme_constant_override("separation", 8)
+    _root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _root.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+    add_child(_root)
 
-	var vb: VBoxContainer = _make_root_vbox()
+    var header := PanelContainer.new(); ThemeUtil.style_glass_header(header); _root.add_child(header)
+    var hb := HBoxContainer.new(); header.add_child(hb)
+    var title := Label.new(); title.text = "Fleet"; ThemeUtil.set_label_color(title); title.add_theme_font_size_override("font_size", 16); hb.add_child(title)
+    var fill := Control.new(); fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(fill)
+    _search = LineEdit.new(); _search.placeholder_text = "Search units..."; _search.custom_minimum_size = Vector2(240,0)
+    _search.text_changed.connect(func(_t: String) -> void: _rebuild())
+    hb.add_child(_search)
 
-	var header_card := PanelContainer.new()
-	ThemeUtil.style_glass_header(header_card)
-	vb.add_child(header_card)
-	var header_box := HBoxContainer.new()
-	header_card.add_child(header_box)
-	var header_label := Label.new()
-	header_label.text = "Fleet"
-	ThemeUtil.set_label_color(header_label)
-	header_label.add_theme_font_size_override("font_size", 16)
-	header_box.add_child(header_label)
+    var card := PanelContainer.new(); ThemeUtil.style_card(card); _root.add_child(card)
+    var m := MarginContainer.new(); for k in ["left","top","right","bottom"]: m.add_theme_constant_override("margin_" + k, 10); card.add_child(m)
+    var sc := ScrollContainer.new(); sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sc.size_flags_vertical = Control.SIZE_EXPAND_FILL; m.add_child(sc)
+    _list = VBoxContainer.new(); _list.add_theme_constant_override("separation", 4); _list.size_flags_horizontal = Control.SIZE_EXPAND_FILL; _list.size_flags_vertical = Control.SIZE_EXPAND_FILL; sc.add_child(_list)
 
-	for t in GameState.data.fleet:
-		var card := PanelContainer.new()
-		ThemeUtil.style_card(card)
-		vb.add_child(card)
-		var row := HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+func _load_fleet() -> void:
+    _fleet.clear()
+    if GameState and GameState.data and GameState.data.has("fleet"):
+        for t in GameState.data.fleet:
+            if typeof(t) == TYPE_DICTIONARY:
+                _fleet.append(t)
 
-		var lbl := Label.new()
-		ThemeUtil.set_label_color(lbl)
-		lbl.text = "%s • %s • %s" % [t.get("unit_id",""), t.get("model",""), t.get("status","")]
-		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(lbl)
+func _rebuild() -> void:
+    for c in _list.get_children(): c.queue_free()
 
-		var btn := Button.new()
-		btn.text = "Toggle Status"
-		btn.pressed.connect(func():
-			t.status = ("Maintenance" if t.status == "Active" else "Active")
-			_build()
-		)
-		row.add_child(btn)
-		card.add_child(row)
+    if _fleet.is_empty():
+        var none := Label.new(); ThemeUtil.set_label_color(none)
+        none.text = "No units yet."
+        none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        none.custom_minimum_size = Vector2(0, 120)
+        _list.add_child(none)
+        return
 
-		vb.add_child(ThemeUtil.create_divider())
+    var q := _search.text.to_lower()
+    var any := false
+    for t in _fleet:
+        var unit := String(t.get("unit_id",""))
+        var model := String(t.get("model","Truck"))
+        var status := String(t.get("status","Active"))
+        var label := unit + " — " + model + " [" + status + "]"
+        if q != "" and label.to_lower().find(q) == -1:
+            continue
+        any = true
+        _list.add_child(_row(t))
+        var line := ColorRect.new(); line.custom_minimum_size = Vector2(0,1); line.color = Color(1,1,1,0.06); _list.add_child(line)
 
-	var form := HBoxContainer.new()
-	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    if not any:
+        var none := Label.new(); ThemeUtil.set_label_color(none)
+        none.text = "No results match your search."
+        none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        none.custom_minimum_size = Vector2(0, 120)
+        _list.add_child(none)
 
-	var id_in := LineEdit.new()
-	id_in.placeholder_text = "Unit ID"
-	id_in.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var model_in := LineEdit.new()
-	model_in.placeholder_text = "Model"
-	model_in.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var add_btn := Button.new()
-	add_btn.text = "Add Truck"
-	ThemeUtil.style_primary(add_btn)
-	add_btn.pressed.connect(func():
-		if id_in.text.strip_edges() != "":
-			GameState.data.fleet.append({"unit_id": id_in.text.strip_edges(), "model": model_in.text.strip_edges(), "status": "Active"})
-			_build()
-	)
-	form.add_child(id_in)
-	form.add_child(model_in)
-	form.add_child(add_btn)
-	vb.add_child(form)
+func _row(t: Dictionary) -> Control:
+    var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 8); hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.custom_minimum_size = Vector2(0, 36)
 
-func _make_root_vbox() -> VBoxContainer:
-	var margin := MarginContainer.new()
-	margin.anchor_right = 1.0
-	margin.anchor_bottom = 1.0
-	add_child(margin)
+    var stripe := ColorRect.new(); stripe.custom_minimum_size = Vector2(6, 24); stripe.color = _status_color(String(t.get("status",""))); hb.add_child(stripe)
 
-	var scroll := ScrollContainer.new()
-	scroll.anchor_right = 1.0
-	scroll.anchor_bottom = 1.0
-	margin.add_child(scroll)
+    var lbl := Label.new(); ThemeUtil.set_label_color(lbl)
+    var unit := String(t.get("unit_id",""))
+    var model := String(t.get("model","Truck"))
+    var status := String(t.get("status","Active"))
+    var integ := int(t.get("integrity", 100))
+    lbl.text = "%s — %s  |  Integrity: %d%%  |  %s" % [unit, model, integ, status]
+    hb.add_child(lbl)
 
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
-	scroll.add_child(vb)
-	return vb
+    var fill := Control.new(); fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(fill)
+
+    var btn := Button.new()
+    if status.to_lower() == "in shop":
+        btn.text = "Return to Service"
+        btn.pressed.connect(func() -> void:
+            t["status"] = "Active"
+            GameState.save_now()
+            _rebuild()
+        )
+    else:
+        btn.text = "Send to Shop"
+        btn.pressed.connect(func() -> void:
+            t["status"] = "In Shop"
+            GameState.save_now()
+            _rebuild()
+        )
+    hb.add_child(btn)
+
+    return hb
+
+func _status_color(st: String) -> Color:
+    st = st.to_lower()
+    if st == "active": return Color(0.25,0.65,0.35)
+    if st == "in shop": return Color(0.70,0.35,0.20)
+    if st == "idle": return Color(0.40,0.40,0.70)
+    return Color(0.30,0.30,0.30)

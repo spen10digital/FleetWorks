@@ -9,6 +9,11 @@ var minutes_per_real_second: float = 10.0
 var _timer: Timer
 var _paused: bool = false
 
+# Ensure this exists in your SimClock script:
+func get_game_minutes() -> int:
+	return game_minutes
+
+
 func _ready() -> void:
 	_timer = Timer.new()
 	_timer.one_shot = false
