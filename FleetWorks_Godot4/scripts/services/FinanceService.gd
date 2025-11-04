@@ -1,27 +1,20 @@
 extends Node
-class_name FinanceService
-
 func ensure_defaults() -> void:
-	# Make sure finance exists and is a Dictionary with required keys
-	if not GameState.data.has("finance") or typeof(GameState.data["finance"]) != TYPE_DICTIONARY:
-		GameState.data["finance"] = {"balance": 50000.0, "txns": []}
-	else:
-		if not GameState.data["finance"].has("balance"):
-			GameState.data["finance"]["balance"] = 50000.0
-		if not GameState.data["finance"].has("txns"):
-			GameState.data["finance"]["txns"] = []
+	if not GameState.data.has("finance"):
+		GameState.data.finance = {"balance": 50000.0, "txs": []}
+
+func add_tx(memo: String, amount: float) -> void:
+	var f: Dictionary = GameState.data.finance
+	if not f.has("txs"):
+		f["txs"] = []
+	var tx: Dictionary = {"time": Time.get_unix_time_from_system(), "memo": memo, "amount": amount}
+	(f["txs"] as Array).append(tx)
+	f["balance"] = float(f.get("balance", 0.0)) + float(amount)
 
 func balance() -> float:
-	ensure_defaults()
-	var fin: Dictionary = GameState.data["finance"]
-	return float(fin.get("balance", 0.0))
+	return float(GameState.data.finance.get("balance", 0.0))
 
-func add_tx(desc: String, amount: float) -> void:
-	ensure_defaults()
-	var fin: Dictionary = GameState.data["finance"]
-	fin["balance"] = float(fin.get("balance", 0.0)) + float(amount)
-	var tx: Dictionary = {"desc": String(desc), "amount": float(amount)}
-	var txs: Array = fin.get("txns", [])
-	txs.append(tx)
-	fin["txns"] = txs
-	GameState.save_now()
+func tick_hour(econ: Node) -> void:
+	var wages: float = 120.0
+	var overhead: float = 45.0
+	add_tx("Hourly ops costs", -(wages + overhead))

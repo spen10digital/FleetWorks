@@ -2,13 +2,20 @@
 extends Control
 const ThemeUtil = preload("res://scripts/ui/ThemeUtil.gd")
 
+const SimClockRes        = preload("res://scripts/sim/SimClock.gd")
+const FinanceServiceRes  = preload("res://scripts/services/FinanceService.gd")
+const JobServiceRes      = preload("res://scripts/services/JobService.gd")
+const MaintenanceServiceRes = preload("res://scripts/services/MaintenanceService.gd")
+const EconomyServiceRes  = preload("res://scripts/services/EconomyService.gd")
+const NotifierServiceRes = preload("res://scripts/services/NotifierService.gd") # if you have this file
+
 # Global classes
-var _clock: SimClock
-var _fin: FinanceService
-var _jobs: JobService
-var _maint: MaintenanceService
-var _econ: EconomyService
-var _notifier: NotifierService
+var _clock: Node
+var _fin: Node
+var _jobs: Node
+var _maint: Node
+var _econ: Node
+var _notifier: Node
 
 # Top header ("status bar")
 var _top_layer: CanvasLayer
@@ -58,30 +65,58 @@ const PALETTE_LIGHT := {
 const BASE_SPEED := 10.0
 var _speed_mult: float = 1.0
 
+const SimCore = preload("res://scripts/sim/SimCore.gd")
+var _core: Node
+
 func _ready() -> void:
 	GameState.settings_changed.connect(func() -> void: _apply_theme())
 	_build_layout()
 	_apply_theme()
 	_nav_to("Dashboard")
 	_ready_services_v22()
+	_core = SimCore.new()
+	add_child(_core)
+
+	# Optional: refresh header on sim events
+	if _core.has_signal("job_completed"):
+		_core.job_completed.connect(func(_job: Dictionary, _payout: float) -> void:
+			_update_top_header(_core.clock.game_minutes)
+		)
+	if _core.has_signal("expense_incurred"):
+		_core.expense_incurred.connect(func(_label: String, _amt: float) -> void:
+			_update_top_header(_core.clock.game_minutes)
+		)
 
 func _ready_services_v22() -> void:
-	_clock = SimClock.new(); add_child(_clock)
-	_fin = FinanceService.new(); _fin.ensure_defaults()
-	_jobs = JobService.new()
-	_maint = MaintenanceService.new()
-	_econ = EconomyService.new(); _econ.ensure_defaults()
-	_notifier = NotifierService.new(); add_child(_notifier)
+	# Use SimCore's instances so we don't double-tick anything.
+	if _core:
+		_clock = _core.clock
+		_fin   = _core.finance
+		_jobs  = _core.jobs
+		_maint = _core.maint
+		_econ  = _core.econ
+	else:
+		# Fallback (only if SimCore wasn't created for some reason)
+		_clock = SimClockRes.new(); add_child(_clock)
+		_fin   = FinanceServiceRes.new(); _fin.ensure_defaults()
+		_jobs  = JobServiceRes.new()
+		_maint = MaintenanceServiceRes.new()
+		_econ  = EconomyServiceRes.new(); _econ.ensure_defaults()
 
-	_clock.minute_tick.connect(func(m: int) -> void:
-		_maint.tick_minute()
-		_econ.tick_minute()
-		_update_top_header(m)
-		_refresh_alerts()
-	)
+	# Notifier is purely UI-facing; safe to own locally.
+	_notifier = NotifierServiceRes.new(); add_child(_notifier)
 
 	_build_top_header()
-	_update_top_header(_clock.game_minutes)
+
+	# Prime header once using whatever the clock exposes.
+	var gm: int = 0
+	if _clock and _clock.has_method("get_game_minutes"):
+		gm = _clock.get_game_minutes()
+	else:
+		var maybe_gm = _clock.get("game_minutes")
+		if typeof(maybe_gm) == TYPE_INT:
+			gm = maybe_gm
+	_update_top_header(gm)
 	_refresh_alerts()
 
 	_resolve_sidebar()

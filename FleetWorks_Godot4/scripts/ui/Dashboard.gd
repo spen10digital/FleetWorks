@@ -1,6 +1,6 @@
-
 extends Control
-const ThemeUtil = preload("res://scripts/ui/ThemeUtil.gd")
+const ThemeUtil            = preload("res://scripts/ui/ThemeUtil.gd")
+const FinanceServiceRes    = preload("res://scripts/services/FinanceService.gd") # ⬅ add this
 
 func _ready() -> void:
 	var vb: VBoxContainer = _make_root_vbox()
@@ -41,11 +41,15 @@ func _ready() -> void:
 	inner.add_child(stats)
 
 	# Balance
-	var fin := FinanceService.new()
-	fin.ensure_defaults()
+	var fin: Node = FinanceServiceRes.new()   # ⬅ explicit type + preload new()
+	if fin.has_method("ensure_defaults"):
+		fin.ensure_defaults()
 	var bal := Label.new()
 	ThemeUtil.set_label_color(bal)
-	bal.text = "Balance: $" + str(fin.balance())
+	if fin.has_method("balance"):
+		bal.text = "Balance: $" + str(fin.balance())
+	else:
+		bal.text = "Balance: (service missing)"
 	inner.add_child(bal)
 
 func _make_root_vbox() -> VBoxContainer:
