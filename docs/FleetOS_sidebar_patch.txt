@@ -1,0 +1,67 @@
+
+FleetWorks v22a — Dynamic Sidebar-Aware Top Header
+--------------------------------------------------
+
+### What's new
+This patch replaces the fixed 220px sidebar guess with a live measurement.
+The header now automatically adjusts whenever the sidebar or viewport resizes.
+
+### 1) Add/verify these vars near the top of FleetOS.gd
+
+@export var sidebar_path: NodePath        # assign your sidebar Control node in the editor
+var _sidebar: Control = null
+
+### 2) Replace `_position_top_header()` with:
+
+func _position_top_header() -> void:
+	var vp_size := get_viewport_rect().size
+	var left_x := 12.0
+
+	if _sidebar and is_instance_valid(_sidebar):
+		var r := _sidebar.get_global_rect()
+		left_x = r.end.x + 12.0
+
+	var right_margin := 12.0
+	var y := 12.0
+	var width := max(200.0, vp_size.x - left_x - right_margin)
+	var height := 46.0
+
+	_top_panel.position = Vector2(left_x, y)
+	_top_panel.size = Vector2(width, height)
+
+### 3) Add these helpers anywhere below your v22 header functions
+
+func _resolve_sidebar() -> void:
+	_sidebar = null
+	if sidebar_path != NodePath():
+		var n := get_node_or_null(sidebar_path)
+		if n and n is Control:
+			_sidebar = n
+
+	if _sidebar == null:
+		for name in ["Sidebar", "LeftMenu", "Nav", "Menu", "SidePanel"]:
+			var cand := get_node_or_null(name)
+			if cand and cand is Control:
+				_sidebar = cand
+				break
+
+func _hook_sidebar_signals() -> void:
+	if _sidebar and not _sidebar.resized.is_connected(_on_sidebar_resized):
+		_sidebar.resized.connect(_on_sidebar_resized)
+
+func _on_sidebar_resized() -> void:
+	_position_top_header()
+
+### 4) After `_build_top_header()` in `_ready_services_v22()`, add:
+
+_resolve_sidebar()
+_hook_sidebar_signals()
+_position_top_header()
+
+### 5) Keep the viewport resize hook (already present):
+
+func _notification(what):
+	if what == NOTIFICATION_RESIZED and _top_panel:
+		_position_top_header()
+
+That’s it — your top glass header will now reposition automatically based on the actual sidebar width and live window resizing.
