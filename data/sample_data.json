@@ -1,0 +1,55 @@
+{
+  "fleet": [
+    {
+      "unit_id": "T-100",
+      "model": "Titan 90K Cabover",
+      "status": "Active"
+    },
+    {
+      "unit_id": "H-200",
+      "model": "Heron Long Nose",
+      "status": "Maintenance"
+    }
+  ],
+  "drivers": [
+    {
+      "name": "Alex Vega",
+      "license": "CDL-A",
+      "status": "Available"
+    },
+    {
+      "name": "Sam Patel",
+      "license": "CDL-A",
+      "status": "On Duty"
+    }
+  ],
+  "jobs": [
+    {
+      "origin": "Boise, ID",
+      "destination": "Seattle, WA",
+      "pay": "2200",
+      "status": "Completed"
+    },
+    {
+      "origin": "Salt Lake City, UT",
+      "destination": "Denver, CO",
+      "pay": "1800",
+      "status": "Posted"
+    }
+  ],
+  "routes": [
+    {
+      "origin": "Boise, ID",
+      "destination": "Seattle, WA",
+      "distance": 500
+    },
+    {
+      "origin": "Salt Lake City, UT",
+      "destination": "Denver, CO",
+      "distance": 520
+    }
+  ],
+  "finance": {
+    "starting_cash": 100000
+  }
+}

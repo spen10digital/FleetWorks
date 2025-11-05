@@ -1,0 +1,1 @@
+Replace res://scripts/FleetOS.gd and res://scripts/sim/SimClock.gd. Adds a separate status bar with speed controls and a divider, and supports pause/resume.

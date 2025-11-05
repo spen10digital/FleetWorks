@@ -1,0 +1,114 @@
+
+FleetWorks v22 — Top Header + Systems (SimClock, Finance, Jobs, Maintenance, Economy)
+------------------------------------------------------------------------------------
+
+1) Add preloads and vars near the top of FleetOS.gd:
+----------------------------------------------------------------
+const SimClock = preload("res://scripts/sim/SimClock.gd")
+const FinanceService = preload("res://scripts/services/FinanceService.gd")
+const JobService = preload("res://scripts/services/JobService.gd")
+const MaintenanceService = preload("res://scripts/services/MaintenanceService.gd")
+const EconomyService = preload("res://scripts/services/EconomyService.gd")
+
+var _clock: SimClock
+var _fin: FinanceService
+var _jobs: JobService
+var _maint: MaintenanceService
+var _econ: EconomyService
+
+var _top_layer: CanvasLayer
+var _top_panel: PanelContainer
+var _label_time: Label
+var _label_bal: Label
+var _label_fuel: Label
+var _label_weather: Label
+----------------------------------------------------------------
+
+2) At the END of func _ready(): call:
+----------------------------------------------------------------
+_ready_services_v22()
+----------------------------------------------------------------
+
+3) Add these new functions to FleetOS.gd (anywhere in the script body):
+----------------------------------------------------------------
+func _ready_services_v22() -> void:
+	_clock = SimClock.new(); add_child(_clock)
+	_fin = FinanceService.new()
+	_jobs = JobService.new()
+	_maint = MaintenanceService.new()
+	_econ = EconomyService.new(); _econ.ensure_defaults()
+
+	_clock.minute_tick.connect(func(m: int) -> void:
+		_maint.tick_minute()
+		_econ.tick_minute()
+		_update_top_header(m)
+	)
+
+	_build_top_header()
+	_update_top_header(_clock.game_minutes)
+
+func _build_top_header() -> void:
+	_top_layer = CanvasLayer.new()
+	add_child(_top_layer)
+
+	_top_panel = PanelContainer.new()
+	ThemeUtil.style_glass_header(_top_panel)
+	_top_layer.add_child(_top_panel)
+
+	var root := HBoxContainer.new()
+	root.add_theme_constant_override("separation", 16)
+	root.custom_minimum_size = Vector2(0, 46)
+	_top_panel.add_child(root)
+
+	_label_time = Label.new(); ThemeUtil.set_label_color(_label_time)
+	_label_bal = Label.new(); ThemeUtil.set_label_color(_label_bal)
+	_label_fuel = Label.new(); ThemeUtil.set_label_color(_label_fuel)
+	_label_weather = Label.new(); ThemeUtil.set_label_color(_label_weather)
+
+	root.add_child(_label_time)
+	root.add_child(HSeparator.new())
+	root.add_child(_label_bal)
+	root.add_child(HSeparator.new())
+	root.add_child(_label_fuel)
+	root.add_child(HSeparator.new())
+	root.add_child(_label_weather)
+
+	_position_top_header()
+
+func _position_top_header() -> void:
+	var sidebar_guess := 220.0
+	_top_panel.position = Vector2(sidebar_guess + 12, 12)
+	_top_panel.size = Vector2(get_viewport_rect().size.x - (sidebar_guess + 24), 46)
+
+func _notification(what):
+	if what == NOTIFICATION_RESIZED and _top_panel:
+		_position_top_header()
+
+func _update_top_header(m: int) -> void:
+	_label_time.text = SimClock.fmt_time(m)
+	_label_bal.text = "Balance: $" + str(_fin.balance())
+	_label_fuel.text = "Fuel: " + _econ.fuel_text()
+	_label_weather.text = "Weather: " + _econ.weather_text()
+
+func _complete_assigned_job_every_120() -> void:
+	var idx := -1
+	for i in range(GameState.data.jobs.size()):
+		if String(GameState.data.jobs[i].get("status","")) == "Assigned": idx = i; break
+	if idx == -1: return
+	GameState.data.jobs[idx]["status"] = "Completed"
+	var amt := float(String(GameState.data.jobs[idx].get("pay","0")))
+	_fin.add_tx("Job completed: " + String(GameState.data.jobs[idx].get("origin","")) + " → " + String(GameState.data.jobs[idx].get("destination","")), amt)
+	var unit := String(GameState.data.jobs[idx].get("unit_id",""))
+	var driver := String(GameState.data.jobs[idx].get("driver",""))
+	for t in GameState.data.fleet:
+		if String(t.get("unit_id","")) == unit: t["status"] = "Active"
+	for d in GameState.data.drivers:
+		if String(d.get("name","")) == driver: d["status"] = "Available"
+	GameState.save_now()
+----------------------------------------------------------------
+
+4) (Optional) Dashboard: add speed controls / balance readout using these services.
+----------------------------------------------------------------
+
+That’s it. The top header rides on a CanvasLayer and stays visible
+across tabs. It updates every simulated minute.
